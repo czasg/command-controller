@@ -1,9 +1,9 @@
 # coding: utf-8
 import cc
 
-from cmd.cron import cmd as CronCmd
-from cmd.init import cmd as InitCmd
-from cmd.server import cmd as ServerCmd
+from cmds.cron import cmd as CronCmd
+from cmds.init import cmd as InitCmd
+from cmds.server import cmd as ServerCmd
 
 
 def start():
@@ -14,6 +14,3 @@ def start():
         ServerCmd
     )
     cc.Execute(cmd)
-
-    import argparse
-

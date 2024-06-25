@@ -182,7 +182,7 @@ def NewCommand() -> Command:
 def is_flag(s: str) -> bool:
     return s.startswith("-")
 
-def parse_entrypoints_flags_from_argv() -> (list, list):
+def parse_entrypoints_flags_from_argv() -> Tuple[list, list]:
     argv = sys.argv[1:]
     entrypoints = []
     for arg in argv:

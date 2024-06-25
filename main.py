@@ -1,9 +1,9 @@
 # coding: utf-8
-import cmd
+import cmds
 
 
 def main():
-    cmd.start()
+    cmds.start()
 
 
 if __name__ == '__main__':
