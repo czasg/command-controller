@@ -3,7 +3,24 @@ import sys
 
 from typing import Tuple
 
-empty_space = 4
+
+def to_bool(value):
+    if isinstance(value, str):
+        value = value.strip().lower()
+        if value in ('yes', 'true', 't', '1', 'ok'):
+            return True
+        elif value in ('no', 'false', 'f', '0'):
+            return False
+    elif isinstance(value, int):
+        return value != 0
+    return False
+
+
+def fix_empty_space(v: str, length: int):
+    if len(v) < length:
+        v += " " * (length - len(v))
+    return v
+
 
 class Flag:
 
@@ -14,6 +31,11 @@ class Flag:
                  require=False,
                  description=None,
                  ):
+        if not flags:
+            raise Exception(f"{self.__name__} need define flags.")
+        for flag in flags:
+            if not flag.startswith("-"):
+                raise Exception(f"flag[{flag}] is invalid, it should be startswith `-`.")
         self.flags = flags
         self.prefetch = prefetch
         self.default = default
@@ -21,34 +43,45 @@ class Flag:
         self.require = require
         self.description = description
         self.v = default
+        self.__done__ = False
 
-    def options(self) -> Tuple[str, str]:
-        flag = self.flags[:]
-        if self.prefetch == 1:
-            flag.append("string")
-        elif self.prefetch > 1:
-            flag.append("list")
-        if self.require:
-            flag.append("[require]")
-        option = " ".join(flag)
-
-        desc = []
-        if self.description:
-            desc.append(self.description)
-        if self.default is not None:
-            desc.append(f"(default: {self.default})")
-        description = "\n".join(desc)
-        return option, description
+    def options(self):
+        short_flag, long_flag = [], []
+        for flag in self.flags:
+            if flag.startswith("--"):
+                long_flag.append(flag)
+            elif flag.startswith("-"):
+                short_flag.append(flag)
+        required = "[require]" if self.require else ""
+        default = f"[default:{self.default}]" if self.default else ""
+        description = self.description if self.description else ""
+        return short_flag, long_flag, required, default, description
+        # flag = self.flags[:]
+        # if self.prefetch == 1:
+        #     flag.append("string")
+        # elif self.prefetch > 1:
+        #     flag.append("list")
+        # if self.require:
+        #     flag.append("[require]")
+        # option = " ".join(flag)
+        #
+        # desc = []
+        # if self.description:
+        #     desc.append(self.description)
+        # if self.default is not None:
+        #     desc.append(f"(default: {self.default})")
+        # description = "\n".join(desc)
+        # return option, description
 
     def __str__(self):
-        option, description = self.options()
-        descriptions = description.split("\n")
-        desc = descriptions[0]
-        for description in descriptions[1:]:
-            desc += "\n"
-            desc += " " * (len(option) + empty_space)
-            desc += description
-        return f"{option}{' '*empty_space}{desc}"
+        short_flag, long_flag, required, default, description = self.options()
+        return f"{short_flag} {long_flag} {required} {default}    {description}"
+
+    def value(self):
+        raise NotImplemented
+
+    def set_value(self, v):
+        self.__done__ = True
 
 
 class FlagInt(Flag):
@@ -56,20 +89,21 @@ class FlagInt(Flag):
     def __init__(self, flags, prefetch=1, *args, **kwargs):
         super().__init__(flags, prefetch=prefetch, *args, **kwargs)
 
-    @property
     def value(self) -> int:
         return self.v
 
-    @value.setter
-    def value(self, v: int):
-        # assert isinstance(v, int), "invalid int value, see --help"
-        self.v = int(v)
-
-    # def __add__(self, v):
-    #     return self.value + v
-    #
-    # def __sub__(self, v):
-    #     return self.value - v
+    def set_value(self, v):
+        if isinstance(v, (str, int)):
+            self.v = int(v)
+        elif isinstance(v, (tuple, list)):
+            if len(v) <= 1:
+                raise Exception("empty flag value")
+            if len(v) > 2:
+                raise Exception(f"flag need only one value, but {len(v) - 1} were given")
+            self.v = int(v[1])
+        else:
+            raise Exception(f"Invalid Flag Value: {v}")
+        super().set_value(v)
 
 
 class FlagStr(Flag):
@@ -77,14 +111,21 @@ class FlagStr(Flag):
     def __init__(self, flags, prefetch=1, *args, **kwargs):
         super().__init__(flags, *args, prefetch=prefetch, **kwargs)
 
-    @property
     def value(self) -> str:
         return self.v
 
-    @value.setter
-    def value(self, v: str):
-        assert isinstance(v, str), "invalid int value, see --help"
-        self.v = v
+    def set_value(self, v):
+        if isinstance(v, (str, int)):
+            self.v = str(v)
+        elif isinstance(v, (tuple, list)):
+            if len(v) <= 1:
+                raise Exception("empty flag value")
+            if len(v) > 2:
+                raise Exception(f"flag need only one value, but {len(v) - 1} were given")
+            self.v = str(v[1])
+        else:
+            raise Exception(f"Invalid Flag Value: {v}")
+        super().set_value(v)
 
 
 class FlagBool(Flag):
@@ -92,17 +133,45 @@ class FlagBool(Flag):
     def __init__(self, flags, prefetch=0, *args, **kwargs):
         super().__init__(flags, prefetch=prefetch, *args, **kwargs)
 
-    @property
     def value(self) -> bool:
         return self.v
 
-    @value.setter
-    def value(self, v: bool):
-        assert isinstance(v, bool), "invalid int value, see --help"
-        self.v = v
+    def set_value(self, v):
+        if isinstance(v, bool):
+            self.v = v
+        elif isinstance(v, (str, int)):
+            self.v = to_bool(v)
+        elif isinstance(v, (tuple, list)):
+            if len(v) <= 1:
+                self.v = True
+            if len(v) > 2:
+                raise Exception(f"flag need only one value, but {len(v) - 1} were given")
+            if len(v) == 2:
+                self.v = to_bool(v[1])
+        else:
+            raise Exception(f"Invalid Flag Value: {v}")
+        super().set_value(v)
 
-    def __bool__(self):
-        return self.value
+
+class FlagList(Flag):
+
+    def __init__(self, flags, prefetch=1, *args, **kwargs):
+        super().__init__(flags, *args, prefetch=prefetch, **kwargs)
+
+    def value(self) -> list:
+        return self.v
+
+    def set_value(self, v):
+        if isinstance(v, (str, int)):
+            self.v = [v]
+        elif isinstance(v, (tuple, list)):
+            if len(v) <= 1:
+                self.v = []
+            else:
+                self.v = v[1:]
+        else:
+            raise Exception(f"Invalid Flag Value: {v}")
+        super().set_value(v)
 
 
 class Command:
@@ -111,40 +180,50 @@ class Command:
         self.sub_commands = {}
         self.sub_command_links = []
 
-        self.flag_pool = {}
-        for flag in dir(self.flags):
-            pass
-        """
-        每一个 command 都需要把 flags 的属性解析出来。
-        1. 方便 args 解析
-        2. 方便 help 输出
-        """
-
     class flags:
         ...
 
-    def help(self):
-        max_option_length = 0
-        options = []
-        for name, flag in vars(self.flags).items():
-            if not isinstance(flag, Flag):
-                continue
-            option, description = flag.options()
-            options.append((option, description))
-            max_option_length = max(max_option_length, len(option))
-        text = []
-        text.append("Options:")
-        for option, description in options:
-            descriptions = description.split("\n")
-            desc = descriptions[0]
-            for description in descriptions[1:]:
-                desc += "\n"
-                desc += " " * (max_option_length+ empty_space)
-                desc += description
-            text.append(f"{option}{' ' * (empty_space+max_option_length-len(option))}{desc}")
-        print("\n".join(text))
-
-
+    def help(self, exit=None):
+        if self.descriptions():
+            print("----------------")
+            print("Descriptions:")
+            print(self.descriptions())
+        if self.sub_command_links:
+            print("----------------")
+            print("Commands:")
+            max_entrypoint_length = 0
+            for command in self.sub_command_links:
+                max_entrypoint_length = max(max_entrypoint_length, len(', '.join(command.entrypoints())))
+            for command in self.sub_command_links:
+                entrypoints = ', '.join(command.entrypoints())
+                entrypoints = fix_empty_space(entrypoints, max_entrypoint_length)
+                descriptions = command.descriptions()
+                print(f"  {entrypoints}    {descriptions}")
+        if [flag for name, flag in vars(self.flags).items() if isinstance(flag, Flag)]:
+            print("----------------")
+            print("Options:")
+            max_short_flag_length = 0
+            max_long_flag_length = 0
+            max_required_length = 0
+            max_default_length = 0
+            options = []
+            for name, flag in vars(self.flags).items():
+                if not isinstance(flag, Flag):
+                    continue
+                short_flag, long_flag, required, default, description = flag.options()
+                options.append((short_flag, long_flag, required, default, description))
+                max_short_flag_length = max(max_short_flag_length, len(" ".join(short_flag)))
+                max_long_flag_length = max(max_long_flag_length, len(" ".join(long_flag)))
+                max_required_length = max(max_required_length, len(required))
+                max_default_length = max(max_default_length, len(default))
+            for short_flag, long_flag, required, default, description in options:
+                short_flag_text = fix_empty_space(" ".join(short_flag), max_short_flag_length)
+                long_flag_text = fix_empty_space(" ".join(long_flag), max_long_flag_length)
+                required = fix_empty_space(required, max_required_length)
+                default = fix_empty_space(default, max_default_length)
+                print(f" {short_flag_text} {long_flag_text} {required} {default}    {description}")
+        if exit is not None:
+            sys.exit(exit)
 
     def entrypoints(self) -> [str]:
         name = self.__class__.__name__.lower()
@@ -154,13 +233,13 @@ class Command:
             name = name[:-3]
         return [name] if name else []
 
-    def descriptions(self) -> [str]:
-        return [
-            f"use by {self.entrypoints()}",
-        ]
+    def descriptions(self) -> str:
+        return ""
 
     def add(self, *commands):
         for command in commands:
+            if type(command) == type:
+                command = command()
             assert isinstance(command, Command), f"{command} typ err"
             assert command.entrypoints(), f"{command} entrypoint is empty"
             for entrypoint in command.entrypoints():
@@ -182,6 +261,7 @@ def NewCommand() -> Command:
 def is_flag(s: str) -> bool:
     return s.startswith("-")
 
+
 def parse_entrypoints_flags_from_argv() -> Tuple[list, list]:
     argv = sys.argv[1:]
     entrypoints = []
@@ -197,15 +277,20 @@ def parse_entrypoints_flags_from_argv() -> Tuple[list, list]:
     flags = []
     flag = []
     for arg in argv:
+        arg = arg.strip()
         if arg.startswith("-"):
             if flag:
                 flags.append(flag)
-            flag = [arg]
+            if "=" in arg:
+                flag = arg.split("=", 1)
+            else:
+                flag = [arg]
             continue
         flag.append(arg)
     if flag:
         flags.append(flag)
     return entrypoints, flags
+
 
 def Execute(cmd: Command):
     if cmd.entrypoints():
@@ -215,123 +300,37 @@ def Execute(cmd: Command):
 
     for entrypoint in entrypoints:
         if entrypoint not in cmd.sub_commands:
-            cmd.help()
-            sys.exit(1)
+            cmd.help(1)
         cmd = cmd.sub_commands[entrypoint]
 
     for flagItem in flags:
         flagName = flagItem[0]
         flagFound = None
         for name, flag in vars(cmd.flags).items():
+            if not isinstance(flag, Flag):
+                continue
             if flagName not in flag.flags:
                 continue
             # set value
-            flag.v = flagItem[1]
+            try:
+                flag.set_value(flagItem)
+            except Exception as e:
+                print(f"flag[{name}] parse error[{e}].")
+                cmd.help(1)
             flagFound = flag
             break
         # not found flag
         if not flagFound:
+            print(f"flag[{flagName}] is not defined")
+            cmd.help(1)
             return
 
+    # check required
+    for name, flag in vars(cmd.flags).items():
+        if not isinstance(flag, Flag):
+            continue
+        if flag.require and not flag.__done__:
+            print(f"flag[{name}] is required.")
+            cmd.help(1)
 
-    # args = sys.argv[1:]
-    # if not args:
-    #     print("--help not entrypoint")
-    #     cmd.help()
-    #     sys.exit(1)
-    # print(sys.argv)
-
-    """
-    前面几个必须是有序的 command，不然无法找到。
-    需要先找到，然后再验证 后面的参数是否符合预期。
-    """
-    # entrypoint_index = 0
-    # for entrypoint in args:
-    #     if entrypoint.startswith("-"):
-    #         break
-    #     if entrypoint not in cmd.sub_commands:
-    #         print(f"--help, unknown {entrypoint}")
-    #         cmd.help()
-    #         sys.exit(1)
-    #     cmd = cmd.sub_commands[entrypoint]
-    #     entrypoint_index += 1
-    #
-    # print(f"found cmd {cmd}")
-
-    # # 解析 cmd flag
-    # short_flag = {}
-    # long_flag = {}
-    # for name, flag in vars(cmd.flags).items():
-    #     if not isinstance(flag, Flag):
-    #         continue
-    #     # print([name, flag])
-    #     # _ = flag.flags
-    #     for _flag in flag.flags:
-    #         if _flag.startswith("--"):
-    #             long_flag[_flag] = flag
-    #         elif _flag.startswith("-"):
-    #             for __flag in _flag.strip("-"):
-    #                 short_flag[f"-{__flag}"] = flag
-    #         else:
-    #             print("--help, flags invalid")
-    #             sys.exit(1)
-    # print(f"short_flag={short_flag}")
-    # print(f"long_flag={long_flag}")
-    #
-    # # 匹配命中
-    # print(args[entrypoint_index:])
-    # flags = args[entrypoint_index:]
-    """
-    不需要支持等于号，意义不大
-    """
-    # index = 0
-    # while index < len(flags):
-    #     flag_str = flags[index]
-    #     if flag_str.startswith("--"):
-    #         # if "=" in flag_str:
-    #         #     flag, value = flag_str.split("=", 1)
-    #         assert flag_str in long_flag, f"flag[{flag_str}] not found, please see --help"
-    #         flag = long_flag[flag_str]
-    #         prefetch = flag.prefetch
-    #         while prefetch > 0:
-    #             prefetch -= 1
-    #             # print(flags[index + 1], "??", index)
-    #             if is_flag(flags[index + 1]):
-    #                 if flag.require:
-    #                     print(f"{flag_str} is required see --help")
-    #                     sys.exit(1)
-    #                 break
-    #             # 赋值
-    #             flag.value = flags[index + 1]
-    #             print(flag.value)
-    #             index += 1
-    #     elif flag_str.startswith("-"):
-    #         for flag_str in flag_str.strip("-").split():
-    #             flag_str = f"-{flag_str}"
-    #             assert flag_str in short_flag, f"flag[{flag_str}] not found, please see --help"
-    #             flag = short_flag[flag_str]
-    #             prefetch = flag.prefetch
-    #             # print(flag_str, prefetch, is_flag(flags[index + 1]))
-    #             while prefetch > 0:
-    #                 prefetch -= 1
-    #                 # print(flags[index + 1], "??", index)
-    #                 if is_flag(flags[index + 1]):
-    #                     if flag.require:
-    #                         print(f"{flag_str} is required see --help")
-    #                         sys.exit(1)
-    #                     break
-    #                 print(flag.value, "!!!")
-    #                 flag.value = flags[index + 1]
-    #                 print(flag.value, "???")
-    #             index += 1
-    #     else:
-    #         print(f"invalid flag {flag_str} --help")
-    #         sys.exit(1)
-    #     index += 1
-    #
-    # for name, flag in vars(cmd.flags).items():
-    #     if not isinstance(flag, Flag):
-    #         continue
-    #     print([name, flag.value])
-    #
-    # cmd.run()
+    cmd.run()
