@@ -90,7 +90,7 @@ class FlagInt(Flag):
         super().__init__(flags, prefetch=prefetch, *args, **kwargs)
 
     def value(self) -> int:
-        return self.v
+        return self.v or 0
 
     def set_value(self, v):
         if isinstance(v, (str, int)):
@@ -112,7 +112,7 @@ class FlagStr(Flag):
         super().__init__(flags, *args, prefetch=prefetch, **kwargs)
 
     def value(self) -> str:
-        return self.v
+        return self.v or ""
 
     def set_value(self, v):
         if isinstance(v, (str, int)):
@@ -134,7 +134,7 @@ class FlagBool(Flag):
         super().__init__(flags, prefetch=prefetch, *args, **kwargs)
 
     def value(self) -> bool:
-        return self.v
+        return self.v or False
 
     def set_value(self, v):
         if isinstance(v, bool):
@@ -159,7 +159,7 @@ class FlagList(Flag):
         super().__init__(flags, *args, prefetch=prefetch, **kwargs)
 
     def value(self) -> list:
-        return self.v
+        return self.v or []
 
     def set_value(self, v):
         if isinstance(v, (str, int)):
@@ -179,6 +179,8 @@ class Command:
     def __init__(self):
         self.sub_commands = {}
         self.sub_command_links = []
+        self.entrypoint = None
+        self.description = None
 
     class flags:
         ...
@@ -278,13 +280,35 @@ def parse_entrypoints_flags_from_argv() -> Tuple[list, list]:
     flag = []
     for arg in argv:
         arg = arg.strip()
-        if arg.startswith("-"):
-            if flag:
-                flags.append(flag)
-            if "=" in arg:
-                flag = arg.split("=", 1)
+        if arg.startswith("-") and flag:
+            flags.append(flag)
+        # long flag
+        if arg.startswith("--"):
+            long_flag = arg
+            # check long flag
+            if not long_flag.strip("-"):
+                print(f"empty long flag[{long_flag}]")
+                sys.exit(1)
+            # parse long flag
+            if "=" in long_flag:
+                flag = long_flag.split("=", 1)
             else:
-                flag = [arg]
+                flag = [long_flag]
+            continue
+        # short flag
+        elif arg.startswith("-"):
+            short_flag = arg
+            # check short flag
+            if "=" in short_flag:
+                print(f"invalid flag[{short_flag}], please use ` ` replace `=`")
+                sys.exit(1)
+            short_flag = short_flag.strip().strip("-")
+            if len(short_flag) == 1:
+                flag = [f"-{short_flag}"]
+            elif len(short_flag) > 1:
+                for f in short_flag[:-1]:
+                    flags.append([f"-{f}"])
+                flag = [f"-{short_flag[-1]}"]
             continue
         flag.append(arg)
     if flag:
@@ -302,6 +326,12 @@ def Execute(cmd: Command):
         if entrypoint not in cmd.sub_commands:
             cmd.help(1)
         cmd = cmd.sub_commands[entrypoint]
+
+    # check help
+    for flagItem in flags:
+        flagName = flagItem[0]
+        if flagName in ("-h", "--help"):
+            cmd.help(0)
 
     for flagItem in flags:
         flagName = flagItem[0]
