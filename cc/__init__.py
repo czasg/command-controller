@@ -8,7 +8,7 @@ Github: https://github.com/czasg/CommandController
 Install: pip install command-controller
 """
 
-__version__ = "0.0.1"
+__version__ = "0.0.2"
 
 
 def to_bool(value):
@@ -52,6 +52,15 @@ class Flag:
         self.description = description
         self.v = default
         self.has_been_configured = False
+
+    @staticmethod
+    def parse_value(flags):
+        obj = (type('EmptyClass', (), {}))()
+        for flagInsName, flagIns in vars(flags).items():
+            if not isinstance(flagIns, Flag):
+                continue
+            setattr(obj, flagInsName, flagIns.value())
+        return obj
 
     def options(self):
         short_flag, long_flag = [], []
@@ -219,11 +228,15 @@ class Command:
         if self.usages():
             print("----------------")
             print(f"Usage:")
-            print(f"  {self.usages()}")
+            for line in self.usages().strip().split("\n"):
+                line = line.strip()
+                print(f"  {line}")
         if self.descriptions():
             print("----------------")
             print("Descriptions:")
-            print(f"  {self.descriptions()}")
+            for line in self.descriptions().strip().split("\n"):
+                line = line.strip()
+                print(f"  {line}")
         if self.sub_command_links:
             print("----------------")
             print("Commands:")
@@ -233,8 +246,11 @@ class Command:
             for command in self.sub_command_links:
                 entrypoints = command.entrypoints()
                 entrypoints = fix_empty_space(entrypoints, max_entrypoint_length)
-                descriptions = command.descriptions()
-                print(f"  {entrypoints}    {descriptions}")
+                descriptions = command.descriptions().strip().split("\n")
+                print(f"  {entrypoints}    {descriptions[0]}")
+                for line in descriptions[1:]:
+                    line = line.strip()
+                    print(f"  {' ' * max_entrypoint_length}    {line}")
         if [flag for name, flag in vars(self.flags).items() if isinstance(flag, Flag)]:
             print("----------------")
             print("Options:")
@@ -260,7 +276,16 @@ class Command:
                 typ = fix_empty_space(typ, max_typ_length)
                 required = fix_empty_space(required, max_required_length)
                 default = fix_empty_space(default, max_default_length)
-                print(f"  {short_flag_text} {long_flag_text} {typ} {required} {default}    {description}")
+                descriptions = description.strip().split("\n")
+                print(f"  {short_flag_text} {long_flag_text} {typ} {required} {default}    {descriptions[0]}")
+                for line in descriptions[1:]:
+                    line = line.strip()
+                    length = (max_short_flag_length +
+                              max_long_flag_length +
+                              max_typ_length +
+                              max_required_length +
+                              max_default_length)
+                    print(f"  {' ' * length}        {line}")
         if exit is not None:
             sys.exit(exit)
 
@@ -313,9 +338,6 @@ def parse_entrypoints_flags_from_argv() -> Tuple[list, list]:
 
 
 def Execute(cmd: Command):
-    # first command entrypoint should be empty.
-    if cmd.entrypoints():
-        cmd = NewCommand().add(cmd)
     # parse sys args.
     entrypoints, flags = parse_entrypoints_flags_from_argv()
     if not entrypoints:
