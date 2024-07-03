@@ -8,7 +8,7 @@ Github: https://github.com/czasg/CommandController
 Install: pip install command-controller
 """
 
-__version__ = "0.0.3"
+__version__ = "0.0.4"
 
 
 def to_bool(value):
@@ -226,20 +226,20 @@ class Command:
 
     def help(self, exit=None):
         if self.usages():
-            print("\033[1;32m━━━━━━━━━━━━━━━━━━\033[0m")
-            print(f"Usage:")
+            print("━━━━━━━━━━━━━━━━━━")
+            print("\033[1;32mUsage:\033[0m")
             for line in self.usages().strip().split("\n"):
                 line = line.strip()
                 print(f"  {line}")
         if self.descriptions():
-            print("\033[1;32m━━━━━━━━━━━━━━━━━━\033[0m")
-            print("Descriptions:")
+            print("━━━━━━━━━━━━━━━━━━")
+            print("\033[1;32mDescriptions:\033[0m")
             for line in self.descriptions().strip().split("\n"):
                 line = line.strip()
                 print(f"  {line}")
         if self.sub_command_links:
-            print("\033[1;32m━━━━━━━━━━━━━━━━━━\033[0m")
-            print("Commands:")
+            print("━━━━━━━━━━━━━━━━━━")
+            print("\033[1;32mCommands:\033[0m")
             max_entrypoint_length = 0
             for command in self.sub_command_links:
                 max_entrypoint_length = max(max_entrypoint_length, len(command.entrypoints()))
@@ -252,8 +252,8 @@ class Command:
                     line = line.strip()
                     print(f"  {' ' * max_entrypoint_length}    {line}")
         if [flag for name, flag in vars(self.flags).items() if isinstance(flag, Flag)]:
-            print("\033[1;32m━━━━━━━━━━━━━━━━━━\033[0m")
-            print("Options:")
+            print("━━━━━━━━━━━━━━━━━━")
+            print("\033[1;32mOptions:\033[0m")
             max_short_flag_length = 0
             max_long_flag_length = 0
             max_typ_length = 0
@@ -317,7 +317,7 @@ class Command:
         return self
 
     def run(self, *args):
-        self.help()
+        self.help(0)
 
 
 def NewCommand() -> Command:
@@ -341,7 +341,7 @@ def Execute(cmd: Command):
     # parse sys args.
     entrypoints, flags = parse_entrypoints_flags_from_argv()
     if not entrypoints:
-        cmd.help()
+        cmd.help(0)
     # parse entrypoint command.
     for entrypoint in entrypoints:
         if entrypoint not in cmd.sub_commands:
