@@ -53,7 +53,11 @@ if __name__ == '__main__':
 
 # 命令组合
 
-同样的命令参数，我们可以通过简单的改造，实现命令组合。
+同样的命令参数，我们可以通过简单的改造，实现命令组合，然后通过下述方式启动：
+
+- `python main.py run server -p 8000`：启动后端服务，并指定端口为8000.
+- `python main.py run cron --cron "0 * * * *"`：启动定时服务，并指定cron参数.
+
 
 ```python
 import cc
