@@ -3,6 +3,11 @@ import sys
 
 from typing import Tuple
 
+"""
+Github: https://github.com/czasg/CommandController
+Install: pip install command-controller
+"""
+
 __version__ = "0.0.1"
 
 
