@@ -8,7 +8,7 @@ Github: https://github.com/czasg/CommandController
 Install: pip install command-controller
 """
 
-__version__ = "0.0.4"
+__version__ = "0.0.5"
 
 
 def to_bool(value):
@@ -220,6 +220,7 @@ class Command:
     def __init__(self):
         self.sub_commands = {}
         self.sub_command_links = []
+        self.parent_command: Command = None
 
     class flags:
         ...
@@ -295,9 +296,19 @@ class Command:
         return name
 
     def usages(self) -> str:
+        usage = []
         if self.entrypoints():
-            return f"{self.entrypoints()} [OPTIONS]"
-        return ""
+            usage.append(self.entrypoints())
+            pc = self.parent_command
+            while pc and pc.entrypoints():
+                usage.append(pc.entrypoints())
+                pc = pc.parent_command
+            usage = usage[::-1]
+        if [flag for name, flag in vars(self.flags).items() if isinstance(flag, Flag)]:
+            usage.append("[OPTIONS]")
+        if self.sub_command_links:
+            usage.append("[COMMAND]")
+        return " ".join(usage)
 
     def descriptions(self) -> str:
         return ""
@@ -309,6 +320,7 @@ class Command:
             assert isinstance(command, Command), f"{command} typ err"
             assert command.entrypoints(), f"{command} entrypoint is empty"
             assert command.entrypoints() not in self.sub_commands, f"{command} deplicate define."
+            command.parent_command = self
             self.sub_commands[command.entrypoints()] = command
             self.sub_command_links.append(command)
         return self
