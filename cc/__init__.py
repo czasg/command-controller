@@ -225,20 +225,18 @@ class Command:
         ...
 
     def help(self, exit=None):
+        print("━━━━━━━━━━━━━━━━━━")
         if self.usages():
-            print("━━━━━━━━━━━━━━━━━━")
             print("\033[1;32mUsage:\033[0m")
             for line in self.usages().strip().split("\n"):
                 line = line.strip()
                 print(f"  {line}")
         if self.descriptions():
-            print("━━━━━━━━━━━━━━━━━━")
             print("\033[1;32mDescriptions:\033[0m")
             for line in self.descriptions().strip().split("\n"):
                 line = line.strip()
                 print(f"  {line}")
         if self.sub_command_links:
-            print("━━━━━━━━━━━━━━━━━━")
             print("\033[1;32mCommands:\033[0m")
             max_entrypoint_length = 0
             for command in self.sub_command_links:
@@ -252,7 +250,6 @@ class Command:
                     line = line.strip()
                     print(f"  {' ' * max_entrypoint_length}    {line}")
         if [flag for name, flag in vars(self.flags).items() if isinstance(flag, Flag)]:
-            print("━━━━━━━━━━━━━━━━━━")
             print("\033[1;32mOptions:\033[0m")
             max_short_flag_length = 0
             max_long_flag_length = 0
